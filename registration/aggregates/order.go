@@ -6,6 +6,7 @@ import (
 	"cqrses/registration/valueobject"
 	"fmt"
 	"reflect"
+	"time"
 )
 
 type applyMethodsAggregateInstanceErr struct {
@@ -25,8 +26,8 @@ func NewOrder() *Order {
 type Order struct {
 	*es.AggregateBase
 	ConferenceID string
-	IsConfirmed bool
-	OrderSeats []valueobject.SeatsQuantity
+	IsConfirmed  bool
+	OrderSeats   []valueobject.SeatsQuantity
 }
 
 type OrderItems struct {
@@ -34,8 +35,7 @@ type OrderItems struct {
 	SeatType string
 }
 
-
-func convert(s []OrderSeats) []valueobject.SeatsQuantity  {
+func convert(s []OrderSeats) []valueobject.SeatsQuantity {
 	result := make(valueobject.SeatsQuantity, len(s))
 	for index, item := range s {
 		result[index] = orderevent.SeatsQuantity{item.Type, item.Quantity}
@@ -66,7 +66,7 @@ func (o *Order) applyOrderPlaced(e orderevent.OrderPlaced) error {
 }
 
 func (o *Order) applySeatsUpdated(e orderevent.SeatsUpdated) error {
-	o.OrderSeats =
+	return nil
 }
 
 //Apply Implement Apply method

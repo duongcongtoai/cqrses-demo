@@ -7,14 +7,15 @@ import (
 
 type Event interface {
 	Type() string
+	Scan(interface{}) error
 }
 type EventMessage struct {
-	AggregateID string    `json:"agg_id"`
-	Type        string    `json:"type"`
-	Version     int       `json:"version"`
-	Metadata    []byte    `json:"meta_data"`
-	Data        Event     `json:"data"`
-	CreatedOn   time.Time `json:"created_on"`
+	AggregateID string    `json:"agg_id" db:"agg_id"`
+	Type        string    `json:"type" db:"type"`
+	Version     int       `json:"version" db:"version"`
+	Metadata    []byte    `json:"meta_data" db:"meta_data"`
+	Data        Event     `json:"data" db:"data"`
+	CreatedOn   time.Time `json:"created_on" db:"created_on"`
 	// CreatedOn   JSONTime    `json:"created_on"`
 }
 

@@ -32,14 +32,14 @@ func AddEvent(a AggregateRoot, e Event) error {
 type EventApplyMethodNotFound string
 
 func (e EventApplyMethodNotFound) Error() string {
-	return fmt.Sprintf("Apply method for event %s not found", e)
+	return fmt.Sprintf("Apply method for event %s not found", string(e))
 }
 
 func NewAggregateBase(id string) *AggregateBase {
 	return &AggregateBase{
 		ID:      id,
 		changes: []EventMessage{},
-		version: -1,
+		version: 0,
 	}
 }
 func (a *AggregateBase) TrackChange(ev Event) {

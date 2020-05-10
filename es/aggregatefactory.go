@@ -10,19 +10,18 @@ type DelegateAggregateFactory struct {
 	delegates map[string]func(string) AggregateRoot
 }
 
-func NewDelegteAggregateFactory() *DelegateAggregateFactory {
+func NewDelegateAggregateFactory() *DelegateAggregateFactory {
 	return &DelegateAggregateFactory{
 		delegates: make(map[string]func(string) AggregateRoot),
 	}
 }
 
-func (d *DelegateAggregateFactory) RegisterDelegate(agg AggregateRoot, delegate func(string) AggregateRoot) error {
-	typeName := typeOf(agg)
-	if _, ok := d.delegates[typeName]; ok {
-		return fmt.Errorf("Delegate for this type already registered: %s", typeName)
+func (d *DelegateAggregateFactory) RegisterDelegate(aggType string, delegate func(string) AggregateRoot) error {
+	if _, ok := d.delegates[aggType]; ok {
+		return fmt.Errorf("Delegate for this type already registered: %s", aggType)
 	}
 
-	d.delegates[typeName] = delegate
+	d.delegates[aggType] = delegate
 	return nil
 }
 

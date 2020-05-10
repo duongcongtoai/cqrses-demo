@@ -1,13 +1,25 @@
 package mysql
 
 import (
+	"cqrses/es"
 	"database/sql"
-	"encoding/json"
-	"es"
 	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+)
+
+var (
+	eventSchema = `CREATE TABLE IF NOT EXISTS events (
+		agg_id varchar(36) NOT NULL,
+		data JSON NOT NULL,
+		created_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		version INT NOT NULL,
+		type varchar(20) NOT NULL,
+		CONSTRAINT fk_agg_id
+		FOREIGN KEY (agg_id) REFERENCES aggregates(agg_id)) ENGINE = InnodB`
+	aggregateSchema = `CREATE TABLE IF NOT EXISTS aggregates (agg_id VARCHAR(36) NOT NULL ,
+		 version INT NOT NULL, UNIQUE(agg_id) ) ENGINE = InnoDB`
 )
 
 type MysqlDomainRepo struct {
@@ -43,13 +55,15 @@ func (r *MysqlDomainRepo) Load(aggType, id string) (es.AggregateRoot, error) {
 			Type string
 			Data []byte
 		}{}
-		// var c es.EventMessage
+
 		err := rows.StructScan(&c)
 		if err != nil {
 			return nil, err
 		}
-		event := r.eventFactory.GetEvent(string(c.Type))
-		err = json.Unmarshal(c.Data, &event)
+		// var c es.EventMessage
+		event := r.eventFactory.GetEvent(c.Type)
+		err = event.Scan(c.Data)
+
 		if err != nil {
 			return nil, err
 		}
@@ -57,14 +71,33 @@ func (r *MysqlDomainRepo) Load(aggType, id string) (es.AggregateRoot, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		// eventMsg := es.NewEventMessage(c.AggID, event, c.Version, time.Now())
-		// aggregate.Hydrate(event)
-		// aggregate.IncrementVersion()
 	}
 	rows.Close()
 	return aggregate, nil
+}
 
+func (r *MysqlDomainRepo) delete(id string) error {
+	deleteEventSchema := "DELETE FROM events WHERE agg_id = ?"
+	deleteAggSchema := "DELETE FROM aggregates WHERE agg_id = ?"
+	tx, err := r.db.Begin()
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	_, err = tx.Exec(deleteEventSchema, id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	_, err = tx.Exec(deleteAggSchema, id)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
+	return nil
 }
 
 func (r *MysqlDomainRepo) Save(agg es.AggregateRoot) error {
@@ -79,14 +112,14 @@ func (r *MysqlDomainRepo) Save(agg es.AggregateRoot) error {
 		}
 		queryLatestVersion := "SELECT version FROM aggregates WHERE agg_id = ?"
 
-		row := tx.QueryRow(queryLatestVersion, agg.ID())
+		row := tx.QueryRow(queryLatestVersion, agg.GetID())
 		var currVer int
 		err = row.Scan(&currVer)
 		if err != nil {
 			switch err {
 			case sql.ErrNoRows:
 				currVer = 0
-				_, err = tx.Exec("INSERT INTO aggregates(agg_id, version) VALUE (?, ?)", agg.ID(), 0)
+				_, err = tx.Exec("INSERT INTO aggregates(agg_id, version) VALUE (?, ?)", agg.GetID(), 0)
 				if err != nil {
 					tx.Rollback()
 					return err
@@ -104,7 +137,7 @@ func (r *MysqlDomainRepo) Save(agg es.AggregateRoot) error {
 			}
 		}
 		updateVersion := "UPDATE aggregates SET version = ? WHERE agg_id = ?"
-		_, err = tx.Exec(updateVersion, expectedVersion+len(resultEvents), agg.ID())
+		_, err = tx.Exec(updateVersion, expectedVersion+len(resultEvents), agg.GetID())
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -123,13 +156,22 @@ func (r *MysqlDomainRepo) Save(agg es.AggregateRoot) error {
 			// 	Version:   *expectedVersion + k + 1,
 			// 	CreatedOn: time.Now(),
 			// }
+
+			// _, err := r.db.NamedExec(insertSchema, event)
 			query, args, err := sqlx.Named(insertSchema, event)
 			query, args, err = sqlx.In(query, args...)
+			query = r.db.Rebind(query)
+			// if err != nil {
+			// 	panic(err)
+			// }
+
+			// query, args, err := sqlx.Named(insertSchema, event)
+			// query, args, err = sqlx.In(query, args...)
 			if err != nil {
 				tx.Rollback()
 				return err
 			}
-			query = r.db.Rebind(query)
+			// query = r.db.Rebind(query)
 			_, err = tx.Exec(query, args...)
 			if err != nil {
 				tx.Rollback()
